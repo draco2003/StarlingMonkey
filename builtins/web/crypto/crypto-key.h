@@ -48,7 +48,9 @@ public:
   [[nodiscard]] uint16_t toInt() const { return this->mask; };
 
   [[nodiscard]] bool isEmpty() const { return this->mask == 0; };
-  bool isSuperSetOf(CryptoKeyUsages &other) const { return (this->mask & other.mask) != 0; };
+  bool isSuperSetOf(CryptoKeyUsages &other) const {
+    return (this->mask & other.mask) == other.mask;
+  };
 
   [[nodiscard]] bool canEncrypt() const { return (this->mask & encrypt_flag) != 0; };
   [[nodiscard]] bool canDecrypt() const { return (this->mask & decrypt_flag) != 0; };
@@ -79,6 +81,9 @@ public:
   };
   [[nodiscard]] bool canOnlyWrapKey() const { return this->mask == wrap_key_flag; };
   [[nodiscard]] bool canOnlyUnwrapKey() const { return this->mask == unwrap_key_flag; };
+  [[nodiscard]] bool canOnlyEncryptDecryptWrapUnwrap() const {
+    return (this->mask & ~(encrypt_flag | decrypt_flag | wrap_key_flag | unwrap_key_flag)) == 0;
+  };
 };
 
 class CryptoKey : public BuiltinNoConstructor<CryptoKey> {
