@@ -3049,6 +3049,14 @@ JSObject *CryptoAlgorithmPBKDF2_DeriveBits::deriveBits(JSContext *cx, JS::Handle
     return JS::NewArrayBuffer(cx, 0);
   }
 
+  // PKCS5_PBKDF2_HMAC takes int for its iteration count and buffer sizes; values that do not
+  // fit an int cannot be passed to it and thus cannot be processed.
+  if (password.size() > INT32_MAX || this->salt.size() > INT32_MAX ||
+      this->iterations > INT32_MAX || derived_length > INT32_MAX) {
+    DOMException::raise(cx, "SubtleCrypto.deriveBits: input is too large", "OperationError");
+    return nullptr;
+  }
+
   mozilla::UniquePtr<uint8_t[], JS::FreePolicy> result{
       static_cast<uint8_t *>(JS_malloc(cx, derived_length))};
   if (!result) {
@@ -3342,6 +3350,13 @@ JSObject *aesCbcCrypt(JSContext *cx, JS::HandleObject key, std::vector<uint8_t> 
     DOMException::raise(cx, "AES-CBC key must be 16, 24 or 32 bytes long", "OperationError");
     return nullptr;
   }
+  }
+
+  // EVP_Cipher takes int for its data sizes; inputs that do not fit an int cannot be passed
+  // to it and thus cannot be processed.
+  if (data.size() > INT32_MAX) {
+    DOMException::raise(cx, "AES-CBC input is too large", "OperationError");
+    return nullptr;
   }
 
   EvpCipherCtxPtr ctx(EVP_CIPHER_CTX_new());
