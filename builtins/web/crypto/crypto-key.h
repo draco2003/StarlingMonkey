@@ -48,7 +48,9 @@ public:
   [[nodiscard]] uint16_t toInt() const { return this->mask; };
 
   [[nodiscard]] bool isEmpty() const { return this->mask == 0; };
-  bool isSuperSetOf(CryptoKeyUsages &other) const { return (this->mask & other.mask) != 0; };
+  bool isSuperSetOf(CryptoKeyUsages &other) const {
+    return (this->mask & other.mask) == other.mask;
+  };
 
   [[nodiscard]] bool canEncrypt() const { return (this->mask & encrypt_flag) != 0; };
   [[nodiscard]] bool canDecrypt() const { return (this->mask & decrypt_flag) != 0; };
@@ -79,9 +81,12 @@ public:
   };
   [[nodiscard]] bool canOnlyWrapKey() const { return this->mask == wrap_key_flag; };
   [[nodiscard]] bool canOnlyUnwrapKey() const { return this->mask == unwrap_key_flag; };
+  [[nodiscard]] bool canOnlyEncryptDecryptWrapUnwrap() const {
+    return (this->mask & ~(encrypt_flag | decrypt_flag | wrap_key_flag | unwrap_key_flag)) == 0;
+  };
 };
 
-class CryptoKey : public BuiltinNoConstructor<CryptoKey> {
+class CryptoKey : public BuiltinNoConstructor<CryptoKey, FinalizableClassPolicy> {
 public:
   static const int ctor_length = 0;
   static constexpr const char *class_name = "CryptoKey";
@@ -122,10 +127,10 @@ public:
     // Returns the cached ECMAScript object associated with the [[usages]] internal slot,
     // which indicates which cryptographic operations are permissible to be used with this key.
     UsagesArray,
-    // We store a JS::PrivateValue in this slot, it will contain either the raw key data.
-    // It will either be an `EVP_PKEY *` or an `uint8_t *`.
-    // `uint8_t *` is used only for HMAC keys, `EVP_PKEY *` is used for all the other key types.
+    // We store a JS::PrivateValue in this slot containing an `EVP_PKEY *` for asymmetric keys.
     Key,
+    // We store a JS::PrivateValue containing a `std::vector<uint8_t> *` holding the raw key
+    // bytes for symmetric keys.
     KeyData,
     KeyDataLength,
     Count
@@ -136,6 +141,8 @@ public:
   static const JSPropertySpec properties[];
 
   static bool init_class(JSContext *cx, JS::HandleObject global);
+
+  static void finalize(JS::GCContext *gcx, JSObject *self);
 
   static JSObject *createHMAC(JSContext *cx, CryptoAlgorithmHMAC_Import *algorithm,
                               std::unique_ptr<std::vector<uint8_t>> data, unsigned long length,
